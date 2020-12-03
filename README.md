@@ -17,4 +17,4 @@ Word frequency (SUBTLEX-US) - https://osf.io/djpqz/
 
 Phonological encoding (CELEX) - http://celex.mpi.nl/
 
-OLD20 (with SUBTLEX-US as reference words) - 
+OLD20 (with SUBTLEX-US as reference words) - https://github.com/stephantul/old20
