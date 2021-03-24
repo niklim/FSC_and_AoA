@@ -1,4 +1,4 @@
-data/
+*.json
 output/FSCrandom
 output/FSCmeasures
 stats/plots/
