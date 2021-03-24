@@ -1,6 +1,6 @@
-*.json
 output/FSCrandom
 output/FSCmeasures
 stats/plots/
 *.RData
 *.ipynb
+*.json
