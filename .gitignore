@@ -1,0 +1,5 @@
+data/
+output/
+stats/plots/
+*.RData
+*.ipynb
