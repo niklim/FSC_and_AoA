@@ -18,7 +18,8 @@ from src.resources import aoa, concreteness, valence, subtlex, old20, morpholex
 from src.utils.neighbors import get_target_embedded_neighbors, get_levenshtein_neighbours
 
 
-random_baseline = True
+random_baseline = False
+sample_vocab = True
 
 data_dir = os.path.join(os.getcwd(), 'data/')
 out_dir = os.path.join(os.getcwd(), 'output/')
@@ -56,9 +57,10 @@ filter_words = list(
         aoa_words, set(w2concr.keys()), set(w2val.keys()), mono, poly, mono_inflected,
     )
 )
+print('The reference vocabulary for measuring SND consists of {} words.'.format(len(filter_words)))
 
 # FIND WORDS SHARED ACROSS RESOURCES, SUCH THAT WE CAN ESTIMATE ALL NECESSARY PREDICTORS: FREQUENCY, CONCRETENESS,
-# VALENCE, SEMANTIC NEIGHBORHHOD DENSITY, AND OLD20. SINCE ICONICITY NORMS ARE FAR SMALLER IN SIZE, A SEPARATE ANALYSIS
+# VALENCE, SEMANTIC NEIGHBOURHOOD DENSITY, AND OLD20. SINCE ICONICITY NORMS ARE FAR SMALLER IN SIZE, A SEPARATE ANALYSIS
 # IS RUN WITH THOSE, WITHOUT FILTERING WORDS FOR THE MAIN EXPERIMENT
 shared = shared_words(
     aoa_words, set(w2concr.keys()), set(w2val.keys()), list(w2v_words), set(w2freq.keys()), set(w2old.keys())
@@ -87,6 +89,8 @@ except FileNotFoundError:
 
 # FIND NEIGHBORS (TARGET-EMBEDDING AND LEVENSHTEIN) FOR ORTHOGRAPHIC AND PHONOLOGICAL FORMS
 reference_vocab = [x for x in set(w2freq.keys()) if str(x) != 'nan']
+
+print('The reference vocabulary for retrieving form-based neighbors consists of {} words.'.format(len(reference_vocab)))
 
 ortho2neighbors_te = get_target_embedded_neighbors(set(t2phon.keys()), reference_vocab)
 print(
@@ -164,10 +168,10 @@ write_df(
 
 if random_baseline:
 
-    n_iterations = 1000
-    seeds = random.sample(range(0, 100000000), n_iterations)
+    n_subsamples = 1000
+    seeds = random.sample(range(0, 100000000), n_subsamples)
     print(datetime.now().strftime(
-        "%d/%m/%Y %H:%M:%S: Started computing FSC from {} random permutations of the embeddings...".format(n_iterations)
+        "%d/%m/%Y %H:%M:%S: Started computing FSC from {} random permutations of the embeddings...".format(n_subsamples)
     ))
 
     # COMPUTE FSC MEASURES FROM RANDOM PERMUTATIONS OF THE WORD EMBEDDINGS, REPEAT 1000 TIMES AND SAVE MEASURES TO FILE
@@ -178,7 +182,7 @@ if random_baseline:
 
     for i, seed in enumerate(seeds):
         np.random.seed(seed)
-        print(datetime.now().strftime("%d/%m/%Y %H:%M:%S: Started permutation {} of {}...".format(i+1, n_iterations)))
+        print(datetime.now().strftime("%d/%m/%Y %H:%M:%S: Started permutation {} of {}...".format(i + 1, n_subsamples)))
         random_embeddings.vectors = np.random.permutation(random_embeddings.vectors)
 
         t2OSC_te_rnd = target_embedded_fsc(ortho2neighbors_te, random_embeddings, w2freq)
@@ -190,3 +194,68 @@ if random_baseline:
             t2phon.keys(), os.path.join(fsc_dir_rnd, "df{}.csv".format(i+1)), w2aoa, t2OSC_te_rnd, t2OSC_ld_rnd,
             t2PSC_te_rnd, t2PSC_ld_rnd, w2concr, w2val, w2freq, w2old, t2phon, w2morph, t2snd
         )
+
+
+if sample_vocab:
+
+    n_subsamples = 500
+    sampling_rates = [50, 75]
+    seeds = random.sample(range(0, 100000000), n_subsamples)
+
+    fsc_dir_subset = os.path.join(out_dir, 'FSCsubset')
+    if not os.path.exists(fsc_dir_subset):
+        os.makedirs(fsc_dir_subset)
+
+    for rate in sampling_rates:
+        print(datetime.now().strftime(
+            "%d/%m/%Y %H:%M:%S: Started computing FSC from {} samples of {}% of the reference vocabulary...".format(
+                n_subsamples, rate
+            )
+        ))
+
+        fsc_subdir_subset = os.path.join(fsc_dir_subset, 'rate{}'.format(rate))
+        if not os.path.exists(fsc_subdir_subset):
+            os.makedirs(fsc_subdir_subset)
+
+        # determine the size of each random sample of the reference vocabulary given the sampling rate
+        target_vocab_size = round(len(reference_vocab)*rate/100)
+
+        for i, seed in enumerate(seeds):
+            np.random.seed(seed)
+            print(datetime.now().strftime(
+                "%d/%m/%Y %H:%M:%S: Sample {} of {}...".format(i + 1, n_subsamples))
+            )
+            reference_vocab_subsample = random.sample(reference_vocab, target_vocab_size)
+
+            ortho2neighbors_te_subsample = get_target_embedded_neighbors(set(t2phon.keys()), reference_vocab_subsample)
+            print(
+                datetime.now().strftime(
+                    "%d/%m/%Y %H:%M:%S: Done retrieving target-embedded neighbors for orthographic neighbors.")
+            )
+            ortho2neighbors_ld_subsample = get_levenshtein_neighbours(set(t2phon.keys()), reference_vocab_subsample)
+            print(
+                datetime.now().strftime(
+                    "%d/%m/%Y %H:%M:%S: Done retrieving Levenshtein distance neighbors for orthographic forms.")
+            )
+
+            phono2neighbors_te_subsample = get_target_embedded_neighbors(t2phon, reference_vocab_subsample, celex=celex)
+            print(
+                datetime.now().strftime(
+                    "%d/%m/%Y %H:%M:%S: Done retrieving target-embedded neighbors for phonological forms.")
+            )
+            phono2neighbors_ld_subsample = get_levenshtein_neighbours(t2phon, reference_vocab_subsample, celex=celex)
+            print(
+                datetime.now().strftime(
+                    "%d/%m/%Y %H:%M:%S: Done retrieving Levenshtein distance neighbors for phonological forms.")
+            )
+
+            t2OSC_te_subset = target_embedded_fsc(ortho2neighbors_te_subsample, embedding_space, w2freq)
+            t2OSC_ld_subset = levenshtein_fsc(ortho2neighbors_ld_subsample, embedding_space)
+            t2PSC_te_subset = target_embedded_fsc(phono2neighbors_te_subsample, embedding_space, w2freq)
+            t2PSC_ld_subset = levenshtein_fsc(phono2neighbors_ld_subsample, embedding_space)
+
+            write_df(
+                t2phon.keys(), os.path.join(fsc_subdir_subset, "df{}.csv".format(i + 1)), w2aoa, t2OSC_te_subset,
+                t2OSC_ld_subset, t2PSC_te_subset, t2PSC_ld_subset, w2concr, w2val, w2freq, w2old, t2phon, w2morph, t2snd
+            )
+

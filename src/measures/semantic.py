@@ -23,12 +23,12 @@ def compute_snd(w):
     return w, snd
 
 
-def neighborhood_density(sem_space, target_words, filter_words, n=20, threads=32):
+def neighborhood_density(sem_space, target_words, reference_vocab, n=20, threads=32):
 
     """
     :param sem_space:       a SemanticSpace object.
     :param target_words:    list, target words for which to compute snd.
-    :param filter_words:    list, reference vocabulary listing words to consider as valid neighbors.
+    :param reference_vocab: list, reference vocabulary listing words to consider as valid neighbors.
     :param n:               int, number of neighbours to consider. Default to 20.
     :param threads:         int, the number of cores to use for parallel processing.
     :return:                dict, mapping words to their respective SND values. Higher values indicate sparser semantic
@@ -39,7 +39,7 @@ def neighborhood_density(sem_space, target_words, filter_words, n=20, threads=32
     global filter_vocab
     global n_neighbors
     embeddings = sem_space
-    filter_vocab = filter_words
+    filter_vocab = reference_vocab
     n_neighbors = n
 
     w2snd = defaultdict(float)
